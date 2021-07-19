@@ -1,0 +1,7 @@
+ftp:
+  host: ftp.gnu.org
+  port: 21
+  user: ''
+  password: ''
+  directory: 'old-gnu/zlibc'
+  chunk_size: 1
