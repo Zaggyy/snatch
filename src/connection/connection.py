@@ -1,35 +1,38 @@
-import ftplib
+import ftputil
 import os
 
 # Create a FTP connection to a server.
-def connect_to_ftp_server(server_name, server_port, user, password):
-    """
-    (str, int) -> ftplib.FTP
-    Connect to a FTP server.
-    """
-    ftp = ftplib.FTP()
-    ftp.connect(server_name, server_port)
-    ftp.login(user=user, passwd=password)
+def connect_to_ftp_server(server_name, user, password):
+    ftp = ftputil.FTPHost(server_name, user, password)
     return ftp
 
-# List a directory on a FTP server.
-def list_directory(ftp, directory):
-    """
-    (ftplib.FTP, str) -> list of str
-    List a directory on a FTP server.
-    """
-    ftp.cwd(directory)
-    return ftp.nlst()
+# Traverse all directories recursively on the FTP server.
+def traverse(ftp, directory, depth=0):
+    files = ftp.listdir(directory)
+    return_files = []
+    for file in files:
+        file_path = os.path.join(directory, file)
+        # Check if a file is a directory.
+        if ftp.path.isdir(file_path):
+            print("Traversing directory: " + file + "...")
+            # Merge with the return_files
+            return_files.extend(traverse(ftp, file_path, depth+1))
+        else:
+            print("Found file: " + file)
+            return_files.append(file_path)
+
+    return return_files
+    
 
 # Download the files from the FTP server.
-def download_files(ftp, directory, files, destination):
-    """
-    (ftplib.FTP, str, list of str, str) -> NoneType
-    Download the files from the FTP server.
-    """
-    ftp.cwd(directory)
+def download_files(ftp, files, destination):
+    ftp.chdir('/')
     for file in files:
         print("Downloading " + file + "...")
         path = os.path.join(destination, file)
-        ftp.retrbinary("RETR " + file, open(path, 'wb').write)
+        # Make sure the path exists.
+        if not os.path.exists(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
+        
+        ftp.download(file, path)
         print("Downloaded " + file + ".")

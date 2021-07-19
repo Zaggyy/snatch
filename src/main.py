@@ -4,7 +4,7 @@ import os
 import threading
 
 from config.config import read_yml_config
-from connection.connection import connect_to_ftp_server, download_files, list_directory
+from connection.connection import connect_to_ftp_server, download_files, traverse
 from utils.utils import chunk, zip_directory
 
 # Check the number of command line arguments
@@ -18,14 +18,13 @@ config = read_yml_config(sys.argv[1])['ftp']
 if config is not None:
     print("Config file loaded successfully")
     host = config["host"]
-    port = config["port"]
     username = config["user"]
     password = config["password"]
     try:
         # Try to connect to the server
-        connection = connect_to_ftp_server(host, port, username, password)
-        files = list_directory(connection, config['directory'])
-        connection.abort()
+        connection = connect_to_ftp_server(host, username, password)
+        with connection:
+            files = traverse(connection, config['directory'])
 
         file_chunks = chunk(files, config['chunk_size'])
         print(f"{len(files)} files found")
@@ -41,9 +40,9 @@ if config is not None:
         for index, chunk in enumerate(file_chunks):
             print(f"Starting thread {index + 1}")
             # Create a FTP connection
-            connection = connect_to_ftp_server(host, port, username, password)
+            connection = connect_to_ftp_server(host, username, password)
             # Download the chunk via thread
-            threading.Thread(target=lambda: download_files(connection, config['directory'], chunk, temp_dir)).start()
+            threading.Thread(target=lambda: download_files(connection, chunk, temp_dir)).start()
 
         # Wait for all threads to finish
         for thread in threading.enumerate():
@@ -59,7 +58,6 @@ if config is not None:
         print("Removing temporary directory")
         shutil.rmtree(temp_dir)
         print("Temporary directory removed")
-
         print("All done")
     except ConnectionRefusedError:
         print("Failed to connect to the server")
