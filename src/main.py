@@ -8,9 +8,17 @@ from connection.connection import connect_to_ftp_server, download_files, travers
 from utils.utils import chunk, zip_directory
 
 # Check the number of command line arguments
-if len(sys.argv) != 2:
-    print("Usage: python3 main.py <config file>")
+if len(sys.argv) < 2:
+    print("Usage: python3 main.py <config file> [--zip]")
+    print('-' * 45)
+    print('Required:')
+    print(' <config_file> - Path to the configuration YAML')
+    print('Optional')
+    print(' [--zip] - Zip the directory on finish')
+    print()
     sys.exit(1)
+
+need_zip = len(sys.argv) > 2 and sys.argv[2] == '--zip'
 
 # Read YAML config file
 config = read_yml_config(sys.argv[1])['ftp']
@@ -49,15 +57,16 @@ if config is not None:
             if thread is not threading.currentThread():
                 thread.join()
 
-        # Zip the downloaded files
-        print("Zipping files")
-        zip_directory(temp_dir)
-        print(f"Zipping completed")
+        # Zip the downloaded files if necessary
+        if need_zip:
+            print("Zipping files")
+            zip_directory(temp_dir)
+            print(f"Zipping completed")
 
-        # Remove the temporary directory even if it's not empty
-        print("Removing temporary directory")
-        shutil.rmtree(temp_dir)
-        print("Temporary directory removed")
+            # Remove the temporary directory even if it's not empty
+            print("Removing temporary directory")
+            shutil.rmtree(temp_dir)
+            print("Temporary directory removed")
         print("All done")
     except ConnectionRefusedError:
         print("Failed to connect to the server")
