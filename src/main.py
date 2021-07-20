@@ -36,6 +36,7 @@ try:
     # Get the file listing
     ftp = Connection(config.config['ftp'])
     files = ftp.traverse(config.config['ftp']['remote_dir'])
+    ftp.disconnect()
     # Create multiple chunks
     file_chunks = chunk(files, config.config['ftp']['chunk_size'])
     logger.divider()
@@ -49,7 +50,7 @@ try:
                                                         len(file_chunks)))
         ftp = Connection(config.config['ftp'], chunk_index + 1)
         # Create a thread
-        thread = threading.Thread(target=lambda: ftp.download(chunk, tmp_dir))
+        thread = threading.Thread(target=lambda: ftp.download(chunk, tmp_dir), daemon=True)
         # Start the thread
         thread.start()
     # Wait for all threads to finish
@@ -61,9 +62,9 @@ try:
     # Zip the directory if necessary
     if args.zip:
         logger.info("Zipping files")
-        archive = config.config['ftp']['remote_dir'].replace('/', '_') + '.zip'
+        archive = config.config['ftp']['remote_dir'].replace('/', '_')
         shutil.make_archive(archive, 'zip', tmp_dir)
-        logger.success("Zipped files to {}".format(archive))
+        logger.success("Zipped files to {}".format(archive + '.zip'))
         # Delete the temporary directory
         shutil.rmtree(tmp_dir)
 except:

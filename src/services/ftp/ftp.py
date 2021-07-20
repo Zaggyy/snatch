@@ -51,3 +51,7 @@ class Connection:
                 self.logger.success('Downloaded file: ' + file)
             except:
                 self.logger.error('File download failed: ' + file)
+        self.disconnect()
+
+    def disconnect(self):
+        self.ftp.close()
