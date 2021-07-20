@@ -1,72 +1,70 @@
-import shutil
-import sys
-import os
+from constants.constants import SCRIPT_VERSION
+from services.config.Config import Config
+from services.ftp.ftp import Connection
+from services.log.Logger import Logger
+import argparse
+import tempfile
 import threading
+import shutil
 
-from config.config import read_yml_config
-from connection.connection import connect_to_ftp_server, download_files, traverse
-from utils.utils import chunk, zip_directory
+from utils.utils import chunk
 
-# Check the number of command line arguments
-if len(sys.argv) < 2:
-    print("Usage: python3 main.py <config file> [--zip]")
-    print('-' * 45)
-    print('Required:')
-    print(' <config_file> - Path to the configuration YAML')
-    print('Optional')
-    print(' [--zip] - Zip the directory on finish')
-    print()
-    sys.exit(1)
+# Parse the arguments
+parser = argparse.ArgumentParser(
+    description='Multi-threaded parallel FTP download script.')
+parser.add_argument('-v', '--version', action='version',
+                    version=SCRIPT_VERSION)
+parser.add_argument(
+    '--config', help='path to the configuration file', required=True)
+parser.add_argument('--zip', action='store_true',
+                    help='should the files be zipped after download')
 
-need_zip = len(sys.argv) > 2 and sys.argv[2] == '--zip'
+args = parser.parse_args()
 
-# Read YAML config file
-config = read_yml_config(sys.argv[1])['ftp']
+# Start the main thread
+logger = Logger('main')
 
-if config is not None:
-    print("Config file loaded successfully")
-    host = config["host"]
-    username = config["user"]
-    password = config["password"]
-    try:
-        # Try to connect to the server
-        connection = connect_to_ftp_server(host, username, password)
-        with connection:
-            files = traverse(connection, config['directory'])
+logger.info("snatch v{}".format(SCRIPT_VERSION))
+logger.divider()
 
-        file_chunks = chunk(files, config['chunk_size'])
-        print(f"{len(files)} files found")
-        print(f"{len(file_chunks)} chunks created")
-
-        # Generate a temporary directory name
-        temp_dir = config['directory'] + '_temp'
-
-        # Make sure that temp_dir exists
-        os.makedirs(temp_dir, exist_ok=True)
-
-        # Create a thread for each chunk
-        for index, chunk in enumerate(file_chunks):
-            print(f"Starting thread {index + 1}")
-            # Create a FTP connection
-            connection = connect_to_ftp_server(host, username, password)
-            # Download the chunk via thread
-            threading.Thread(target=lambda: download_files(connection, chunk, temp_dir)).start()
-
-        # Wait for all threads to finish
-        for thread in threading.enumerate():
-            if thread is not threading.currentThread():
-                thread.join()
-
-        # Zip the downloaded files if necessary
-        if need_zip:
-            print("Zipping files")
-            zip_directory(temp_dir)
-            print(f"Zipping completed")
-
-            # Remove the temporary directory even if it's not empty
-            print("Removing temporary directory")
-            shutil.rmtree(temp_dir)
-            print("Temporary directory removed")
-        print("All done")
-    except ConnectionRefusedError:
-        print("Failed to connect to the server")
+try:
+    # Load configuration
+    config = Config(args.config)
+    config.read_config()
+    config.validate()
+    logger.divider()
+    # Get the file listing
+    ftp = Connection(config.config['ftp'])
+    files = ftp.traverse(config.config['ftp']['remote_dir'])
+    # Create multiple chunks
+    file_chunks = chunk(files, config.config['ftp']['chunk_size'])
+    logger.divider()
+    logger.info("Downloading {} files.".format(len(files)))
+    logger.info("Created {} chunks.".format(len(file_chunks)))
+    # Create a random temporary directory
+    tmp_dir = tempfile.mkdtemp()
+    # Create a thread for each chunk and start it immediately
+    for chunk_index, chunk in enumerate(file_chunks):
+        logger.info("Starting thread {} of {}.".format(chunk_index + 1,
+                                                        len(file_chunks)))
+        ftp = Connection(config.config['ftp'], chunk_index + 1)
+        # Create a thread
+        thread = threading.Thread(target=lambda: ftp.download(chunk, tmp_dir))
+        # Start the thread
+        thread.start()
+    # Wait for all threads to finish
+    for thread in threading.enumerate():
+        if thread is not threading.currentThread():
+            thread.join()
+    logger.divider()
+    logger.info("Downloaded all files to {}".format(tmp_dir))
+    # Zip the directory if necessary
+    if args.zip:
+        logger.info("Zipping files")
+        archive = config.config['ftp']['remote_dir'].replace('/', '_') + '.zip'
+        shutil.make_archive(archive, 'zip', tmp_dir)
+        logger.success("Zipped files to {}".format(archive))
+        # Delete the temporary directory
+        shutil.rmtree(tmp_dir)
+except:
+    logger.error("An error has occurred. Exiting.")

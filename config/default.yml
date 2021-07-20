@@ -2,5 +2,5 @@ ftp:
   host: ftp.gnu.org
   user: 'anonymous'
   password: ''
-  directory: 'old-gnu/Manuals/nano-0.9.99pre3'
+  remote_dir: 'old-gnu/Manuals/nano-0.9.99pre3'
   chunk_size: 20
