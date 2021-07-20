@@ -8,4 +8,6 @@ Create a config file based on config/default.yml or edit the existing config fil
 
 Run the script: `python src/main.py -h`
 ## Additional info
-This project is mostly a learning experience for me. I don't have much experience wit Python threads. If you see anything you'd like to add, feel free to create a pull request or open an issue.
+This project is mostly a learning experience for me as I don't have much experience with Python threads.
+
+If you see anything you'd like to add, feel free to create a pull request or open an issue.
