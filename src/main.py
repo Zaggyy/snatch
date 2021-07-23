@@ -17,7 +17,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument('-v', '--version', action='version',
                     version=SCRIPT_VERSION)
 parser.add_argument(
-    '--config', help='path to the configuration file', required=True)
+    '--config', help='path to the configuration file')
 parser.add_argument('--zip', action='store_true',
                     help='should the files be zipped after download')
 parser.add_argument('--process', action='store_true',
@@ -34,7 +34,8 @@ logger.divider()
 
 try:
     # Load configuration
-    config = Config(args.config)
+    config = Config(args.config if args.config is not None else os.path.join(
+        'config', 'default.yml'))
     config.read_config()
     config.validate()
     logger.divider()
