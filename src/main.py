@@ -2,13 +2,14 @@ from constants.constants import SCRIPT_VERSION
 from services.config.Config import Config
 from services.ftp.ftp import Connection
 from services.log.Logger import Logger
+from utils.utils import chunk
+
 import argparse
 import tempfile
 import threading
 import multiprocessing
 import shutil
-
-from utils.utils import chunk
+import os
 
 # Parse the arguments
 parser = argparse.ArgumentParser(
@@ -21,6 +22,7 @@ parser.add_argument('--zip', action='store_true',
                     help='should the files be zipped after download')
 parser.add_argument('--process', action='store_true',
                     help='use multiple processes instead of threads')
+parser.add_argument('--output', help='set output directory')
 
 args = parser.parse_args()
 
@@ -46,7 +48,7 @@ try:
     logger.info("Downloading {} files.".format(len(files)))
     logger.info("Creating {} processes.".format(len(file_chunks)))
     # Create a random temporary directory
-    tmp_dir = tempfile.mkdtemp()
+    tmp_dir = tempfile.mkdtemp() if args.output is None else args.output
 
     Process = multiprocessing.Process if args.process else threading.Thread
 
@@ -70,10 +72,15 @@ try:
     # Zip the directory if necessary
     if args.zip:
         logger.info("Zipping files")
-        archive = config.config['ftp']['remote_dir'].replace('/', '_')
-        shutil.make_archive(archive, 'zip', tmp_dir)
-        logger.success("Zipped files to {}".format(archive + '.zip'))
-        # Delete the temporary directory
-        shutil.rmtree(tmp_dir)
+        # Get the archive name
+        archive_name = os.path.join(tmp_dir, os.path.basename(
+            config.config['ftp']['remote_dir'])) if args.output is not None else os.path.basename(config.config['ftp']['remote_dir'])
+
+        shutil.make_archive(archive_name, 'zip', tmp_dir)
+        logger.success("Zipped files to {}".format(archive_name + '.zip'))
+        # Get the removal path
+        removal_path = os.path.join(tmp_dir, config.config['ftp']['remote_dir'].split(
+            os.path.sep)[0]) if args.output is not None else tmp_dir
+        shutil.rmtree(removal_path)
 except:
     logger.error("An error has occurred. Exiting.")
