@@ -5,6 +5,7 @@ from services.log.Logger import Logger
 import argparse
 import tempfile
 import threading
+import multiprocessing
 import shutil
 
 from utils.utils import chunk
@@ -18,6 +19,8 @@ parser.add_argument(
     '--config', help='path to the configuration file', required=True)
 parser.add_argument('--zip', action='store_true',
                     help='should the files be zipped after download')
+parser.add_argument('--process', action='store_true',
+                    help='use multiple processes instead of threads')
 
 args = parser.parse_args()
 
@@ -41,22 +44,27 @@ try:
     file_chunks = chunk(files, config.config['ftp']['chunk_size'])
     logger.divider()
     logger.info("Downloading {} files.".format(len(files)))
-    logger.info("Created {} chunks.".format(len(file_chunks)))
+    logger.info("Creating {} processes.".format(len(file_chunks)))
     # Create a random temporary directory
     tmp_dir = tempfile.mkdtemp()
-    # Create a thread for each chunk and start it immediately
+
+    Process = multiprocessing.Process if args.process else threading.Thread
+
+    # Create a process for each chunk and start it immediately
+    processes = []
     for chunk_index, chunk in enumerate(file_chunks):
-        logger.info("Starting thread {} of {}.".format(chunk_index + 1,
+        logger.info("Starting process {} of {}.".format(chunk_index + 1,
                                                         len(file_chunks)))
         ftp = Connection(config.config['ftp'], chunk_index + 1)
-        # Create a thread
-        thread = threading.Thread(target=lambda: ftp.download(chunk, tmp_dir), daemon=True)
-        # Start the thread
-        thread.start()
-    # Wait for all threads to finish
-    for thread in threading.enumerate():
-        if thread is not threading.currentThread():
-            thread.join()
+        # Create a process
+        process = Process(target=lambda: ftp.download(chunk, tmp_dir))
+        processes.append(process)
+        # Start the process
+        process.start()
+
+    for process in processes:
+        process.join()
+
     logger.divider()
     logger.info("Downloaded all files to {}".format(tmp_dir))
     # Zip the directory if necessary
