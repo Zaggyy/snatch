@@ -5,12 +5,17 @@ import os
 
 class Connection:
 
-    def __init__(self, config, num=0):
+    connected = False
+
+    def __init__(self, config, connect=True, num=0):
         self.logger = Logger('ftp' if num < 1 else 'ftp-{}'.format(num))
         self.config = config
-        self.connect()
+        if connect:
+            self.connect()
 
     def connect(self):
+        if self.connected is True:
+            return
         try:
             self.ftp = ftputil.FTPHost(
                 self.config['host'], self.config['user'], self.config['password'])
@@ -21,6 +26,8 @@ class Connection:
 
     # Traverse the FTP directory and return the file list
     def traverse(self, directory):
+        if self.connected is False:
+            self.connect()
         self.logger.info('Traversing directory: ' + directory)
         files = self.ftp.listdir(directory)
         return_files = []
@@ -38,6 +45,8 @@ class Connection:
         return return_files
 
     def download(self, files, destination):
+        if self.connected is False:
+            self.connect()
         for file in files:
             self.logger.info('Downloading file: ' + file)
             path = os.path.join(destination, file)

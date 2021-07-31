@@ -56,8 +56,7 @@ try:
     for chunk_index, chunk in enumerate(file_chunks):
         logger.info("Starting job {} of {}.".format(chunk_index + 1,
                                                     len(file_chunks)))
-        # TODO: Maybe we should start the job faster and let the connection start on first download
-        ftp = Connection(config.config['ftp'], chunk_index + 1)
+        ftp = Connection(config.config['ftp'], False, chunk_index + 1)
         # Create a process
         process = Job(target=lambda: ftp.download(chunk, tmp_dir))
         processes.append(process)
