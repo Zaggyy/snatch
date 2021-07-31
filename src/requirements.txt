@@ -1,3 +1,0 @@
-colorama==0.4.4
-ftputil==5.0.1
-PyYAML==5.4.1
