@@ -30,19 +30,19 @@ class Connection:
             self.connect()
         self.logger.info('Traversing directory: ' + directory)
         files = self.ftp.listdir(directory)
-        return_files = []
+        return_files_dict = {}
 
         for file in files:
             file_path = os.path.join(directory, file)
             # Check if a file is a directory
             if self.ftp.path.isdir(file_path):
                 self.logger.info('Found directory: ' + file_path)
-                return_files.extend(self.traverse(file_path))
+                return_files_dict.update(self.traverse(file_path))
             else:
                 self.logger.info('Found file: ' + file_path)
-                return_files.append(file_path)
+                return_files_dict[file_path] = self.ftp.path.getsize(file_path)
 
-        return return_files
+        return return_files_dict
 
     def download(self, files, destination):
         if self.connected is False:

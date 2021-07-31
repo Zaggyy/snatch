@@ -21,7 +21,8 @@ parser.add_argument('--zip', action='store_true',
                     help='should the files be zipped after download')
 parser.add_argument('--process', action='store_true',
                     help='use multiple processes instead of threads')
-
+parser.add_argument('--dont-wait', action='store_true',
+                    help="don't wait for connection when starting jobs (EXPERIMENTAL)")
 args = parser.parse_args()
 
 # Start the main thread
@@ -29,6 +30,8 @@ logger = Logger('main')
 
 logger.info("snatch v{}".format(SCRIPT_VERSION))
 logger.divider()
+if args.dont_wait:
+    logger.warn("You're using experimental features. Please be careful.")
 
 try:
     # Load configuration
@@ -40,6 +43,9 @@ try:
     # Get the file listing
     ftp = Connection(config.config['ftp'])
     files = ftp.traverse(config.config['ftp']['remote_dir'])
+    # Sort the files dictionary by value
+    files = list(map(lambda x: x[0], dict(
+        reversed(sorted(files.items(), key=lambda item: item[1]))).items()))
     ftp.disconnect()
     # Create multiple chunks
     file_chunks = chunk(files, config.config['ftp']['chunk_size'])
@@ -50,13 +56,12 @@ try:
     tmp_dir = get_output_dir(config.config)
 
     Job = multiprocessing.Process if args.process else threading.Thread
-
     # Create a job for each chunk and start it immediately
     processes = []
     for chunk_index, chunk in enumerate(file_chunks):
         logger.info("Starting job {} of {}.".format(chunk_index + 1,
                                                     len(file_chunks)))
-        ftp = Connection(config.config['ftp'], False, chunk_index + 1)
+        ftp = Connection(config.config['ftp'], not args.dont_wait, chunk_index + 1)
         # Create a process
         process = Job(target=lambda: ftp.download(chunk, tmp_dir))
         processes.append(process)
@@ -81,5 +86,5 @@ try:
         removal_path = os.path.join(
             tmp_dir, config.config['ftp']['remote_dir'].split(os.path.sep)[0])
         shutil.rmtree(removal_path)
-except:
-    logger.error("An error has occurred. Exiting.")
+except Exception as e:
+    logger.error("An error has occurred. Exiting.", e)
