@@ -2,6 +2,7 @@ from services.log.Logger import Logger
 import os
 import yaml
 
+
 class Config():
 
     def __init__(self, file_path):
@@ -22,7 +23,8 @@ class Config():
                 self.config = yaml.load(stream, Loader=yaml.SafeLoader)
                 self.logger.success(f'Config file read: {self.file_path}')
             except yaml.YAMLError as exc:
-                self.logger.error(f'Error while reading the config file: {exc}')
+                self.logger.error(
+                    f'Error while reading the config file: {exc}')
                 raise Exception()
 
     def validate(self):

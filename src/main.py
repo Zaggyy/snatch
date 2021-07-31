@@ -2,10 +2,9 @@ from constants.constants import SCRIPT_VERSION
 from services.config.Config import Config
 from services.ftp.ftp import Connection
 from services.log.Logger import Logger
-from utils.utils import chunk
+from utils.utils import chunk, get_archive_name, get_output_dir
 
 import argparse
-import tempfile
 import threading
 import multiprocessing
 import shutil
@@ -22,7 +21,6 @@ parser.add_argument('--zip', action='store_true',
                     help='should the files be zipped after download')
 parser.add_argument('--process', action='store_true',
                     help='use multiple processes instead of threads')
-parser.add_argument('--output', help='set output directory')
 
 args = parser.parse_args()
 
@@ -47,20 +45,21 @@ try:
     file_chunks = chunk(files, config.config['ftp']['chunk_size'])
     logger.divider()
     logger.info("Downloading {} files.".format(len(files)))
-    logger.info("Creating {} processes.".format(len(file_chunks)))
-    # Create a random temporary directory
-    tmp_dir = tempfile.mkdtemp() if args.output is None else args.output
+    logger.info("Creating {} jobs.".format(len(file_chunks)))
+    # Create a random temporary directory if necessary
+    tmp_dir = get_output_dir(config.config)
 
-    Process = multiprocessing.Process if args.process else threading.Thread
+    Job = multiprocessing.Process if args.process else threading.Thread
 
-    # Create a process for each chunk and start it immediately
+    # Create a job for each chunk and start it immediately
     processes = []
     for chunk_index, chunk in enumerate(file_chunks):
-        logger.info("Starting process {} of {}.".format(chunk_index + 1,
-                                                        len(file_chunks)))
+        logger.info("Starting job {} of {}.".format(chunk_index + 1,
+                                                    len(file_chunks)))
+        # TODO: Maybe we should start the job faster and let the connection start on first download
         ftp = Connection(config.config['ftp'], chunk_index + 1)
         # Create a process
-        process = Process(target=lambda: ftp.download(chunk, tmp_dir))
+        process = Job(target=lambda: ftp.download(chunk, tmp_dir))
         processes.append(process)
         # Start the process
         process.start()
@@ -74,14 +73,14 @@ try:
     if args.zip:
         logger.info("Zipping files")
         # Get the archive name
-        archive_name = os.path.join(tmp_dir, os.path.basename(
-            config.config['ftp']['remote_dir'])) if args.output is not None else os.path.basename(config.config['ftp']['remote_dir'])
+        archive_name = os.path.join(tmp_dir, get_archive_name(config.config))
 
         shutil.make_archive(archive_name, 'zip', tmp_dir)
         logger.success("Zipped files to {}".format(archive_name + '.zip'))
+
         # Get the removal path
-        removal_path = os.path.join(tmp_dir, config.config['ftp']['remote_dir'].split(
-            os.path.sep)[0]) if args.output is not None else tmp_dir
+        removal_path = os.path.join(
+            tmp_dir, config.config['ftp']['remote_dir'].split(os.path.sep)[0])
         shutil.rmtree(removal_path)
 except:
     logger.error("An error has occurred. Exiting.")
